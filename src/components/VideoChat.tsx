@@ -6,6 +6,7 @@ import { io, Socket } from "socket.io-client"
 import { Hand } from 'lucide-react';
 import { motion } from "framer-motion";
 import  {useDispatch} from 'react-redux'
+import { Circle } from 'lucide-react';
 import { logout } from "../../store/UserSlice"
 // import "./App.css"
 import "../App.css"
@@ -57,16 +58,15 @@ export function VideoChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [newMessage, setNewMessage] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteStreamRef = useRef<HTMLVideoElement>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
   const peerConnectionsRef = useRef<{ [key: string]: RTCPeerConnection }>({})
   const [remoteNames, setRemoteNames] = useState<{key:string,name:string,streamId:string, handRaised:boolean,cameraStatus:boolean,micStatus:boolean}[]>([])
   const [name, setName] = useState<string>("")
-
+  const [notification, setNotification] = useState<boolean>(false)
   const [remoteStream, setRemoteStream] = useState<MediaStream[]>([])
-
+  const [onMessagePannel,setOnMesagePannel]= useState<boolean>(false)
   // Scroll to bottom of messages when new messages arrive
 
   const navigate = useNavigate();
@@ -75,9 +75,21 @@ export function VideoChat() {
  console.log( "user from redux", user)
 
   useEffect(() => {
+    if(messages.length > 0){
     console.log("messgaes", messages)
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+   if(!onMessagePannel){
+    setNotification(true)
+    }
+     if(onMessagePannel){
+    setNotification(false)
+    }
+
+  }}, [messages])
+
+{console.log("on message pannel", onMessagePannel)
+  console.log("notication", notification)
+}
 
   useEffect(() => {
     // Initialize media stream
@@ -207,12 +219,6 @@ export function VideoChat() {
       
     })
 
-  
-//     socket.on('userConnected', (userName,users) => {
-//     console.log(`${userName} connected.`);
-//     console.log("users in room ",users.name,users.socket)
-//     setRemoteNames(users.names )
-// });
    
     return () => {
       socket.off("connect")
@@ -349,6 +355,8 @@ export function VideoChat() {
   console.log("hand raised", handRaised)
   socket.emit("handRaised", {name , handRaised:!handRaised, streamId:localStreamRef.current?.id})
   }
+ 
+
 
  
 
@@ -462,9 +470,15 @@ export function VideoChat() {
               })} */}
              
               {isConnected && (
-             <Sheet>
+             <Sheet onOpenChange={(open)=>{setOnMesagePannel(open)}}>
+           
       <SheetTrigger asChild>
-        <Button ><MessageSquare /></Button>
+       <div className='relative'>
+         <Button ><MessageSquare /></Button>
+         {(notification && !onMessagePannel) && (
+          <Circle className='absolute top-0 right-0 h-3 w-3 bg-red-500 rounded-full' />
+         )}
+       </div>
       </SheetTrigger>
       <SheetContent>
         <SheetHeader>
@@ -524,8 +538,9 @@ export function VideoChat() {
         </SheetFooter>
       </SheetContent>
     </Sheet>
+    
               )}
-
+                
              </div>
             
             
@@ -562,7 +577,7 @@ export function VideoChat() {
 
                   <Hand className={remoteName.handRaised ? "fill-yellow-500":"bg-transparent" }/>
                    {remoteName.micStatus == false && (
-                    <div className=' bottom-4 left-2 bg-red-600 flex gap-2 px-2 py-1' ><MicOff/></div>
+                    <div className=' bottom-4 left-2 bg-red-900 flex gap-2 px-2 py-1' ><MicOff/></div>
                   ) }
                     </>
                   )
@@ -582,18 +597,9 @@ export function VideoChat() {
         </div>
 )}
 
-      {/* <div className="flex flex-col gap-4 w-1/3 h-full">
-        <div className="bg-gray-800 p-4 rounded-lg shadow-lg h-full overflow-y-auto">
-          <h2 className="text-xl font-bold text-white mb-4">Connected Users</h2>
-          <ul className="space-y-2">
-            {remoteNames.map((remoteName) => (
-              <li key={remoteName.key} className="text-white">
-                {remoteName.name} {remoteName.handRaised && "✋"}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <Button
+      
+       <div className='bottom-4 right-4 absolute flex flex-col gap-2'>
+         <Button
           variant="destructive"
           onClick={() => {
             dispatch(logout({}))
@@ -602,8 +608,9 @@ export function VideoChat() {
         >
           Logout
         </Button>
-      </div> */}
-    </div>
+       </div>
+      </div>
+  
     </>
   )
 }

@@ -90,9 +90,6 @@ catch (error) {
   setLoading(false);
 }
 }
-
-
-  
 const googleSubmit = async (user: { userName: string | null, email: string | null, uid: string }) => {
   try{
   const result = await fetch("http://localhost:3000/firebaseuser", {
