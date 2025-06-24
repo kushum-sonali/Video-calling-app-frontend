@@ -6,7 +6,7 @@ import { addUser } from "../../store/UserSlice"
 import { useNavigate } from 'react-router-dom';
 import { ClipLoader } from "react-spinners";
 import envConfig from '@/config';
-
+console.log(envConfig)
 interface User{
  fullName:string,
       email:string,
