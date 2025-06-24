@@ -23,7 +23,8 @@ import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router'
 import { MessageSquare } from 'lucide-react';
 import { Label } from '@radix-ui/react-label'
-const socket: Socket = io("http://localhost:3000")
+import envConfig from '@/config'
+const socket: Socket = io(envConfig.backendUrl)
 
 interface SignalingMessage {
   from?: string

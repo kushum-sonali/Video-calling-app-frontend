@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { addUser } from "../../store/UserSlice"
 import { useNavigate } from 'react-router-dom';
 import { ClipLoader } from "react-spinners";
+import envConfig from '@/config';
 
 interface User{
  fullName:string,
@@ -49,7 +50,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     setLoading(false);
     return;
   }
-  const result= await fetch("http://localhost:3000/signup", {
+  const result= await fetch(`${envConfig.backendUrl}/signup`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -92,7 +93,7 @@ catch (error) {
 }
 const googleSubmit = async (user: { userName: string | null, email: string | null, uid: string }) => {
   try{
-  const result = await fetch("http://localhost:3000/firebaseuser", {
+  const result = await fetch(`${envConfig.backendUrl}/firebaseuser`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
