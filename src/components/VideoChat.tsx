@@ -24,7 +24,9 @@ import { useNavigate } from 'react-router'
 import { MessageSquare } from 'lucide-react';
 import { Label } from '@radix-ui/react-label'
 import envConfig from '@/config'
-const socket: Socket = io(envConfig.backendUrl)
+
+
+const socket: Socket = io(envConfig.socketUrl)
 
 interface SignalingMessage {
   from?: string
