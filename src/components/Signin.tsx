@@ -118,7 +118,7 @@ const Signin = () => {
       };
 
       dispatch(addUser(userToSave));
-      navigate('/video-chat');
+      navigate('/room-setup');
     } catch (error) {
       console.error('Signin error:', error);
       setError('An error occurred during signin');
@@ -157,7 +157,7 @@ const Signin = () => {
       };
 
       dispatch(addUser(userToSave));
-      navigate('/video-chat');
+      navigate('/room-setup');
     } catch (error) {
       console.error('Google signin error:', error);
       setError('Google signin failed');
@@ -492,7 +492,7 @@ const Signin = () => {
                 <p className="text-gray-600">
                   Don't have an account?{' '}
                   <motion.button
-                    onClick={() => navigate('/')}
+                    onClick={() => navigate('/signup')}
                     className="text-blue-600 hover:text-blue-700 font-medium"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}

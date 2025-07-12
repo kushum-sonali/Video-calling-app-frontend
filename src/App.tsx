@@ -4,8 +4,12 @@ import { Button } from "./components/ui/button";
 import { Moon } from 'lucide-react';
 import { Sun } from 'lucide-react';
 import {lazy,Suspense} from 'react';
+import { useSelector } from 'react-redux';
+import { Navigate } from 'react-router-dom';
+
 const Signup = lazy(() => import('./components/Singup'));
 const Signin = lazy(() => import('./components/Signin'));
+const RoomSetup = lazy(() => import('./components/RoomSetup'));
 // If VideoChat is a named export:
 const VideoChatComponent = lazy(() =>
   import("./components/VideoChat").then(module => ({ default: module.VideoChat }))
@@ -15,8 +19,33 @@ const VideoChatComponent = lazy(() =>
 // const VideoChatComponent = lazy(() => import("./components/VideoChat"));
 import {Routes, Route} from 'react-router-dom';
 
+// Protected Route Components
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useSelector((state: any) => state.user);
+  
+  // If no user, redirect to signin
+  if (!user) {
+    return <Navigate to="/signin" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+const AuthRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useSelector((state: any) => state.user);
+  
+  // If user is already signed in, redirect to room setup
+  if (user) {
+    return <Navigate to="/room-setup" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
 function App() {
   const [theme, setTheme] = useState("light");
+  const { user } = useSelector((state: any) => state.user);
+  
   const handleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light";
     setTheme(newTheme);
@@ -36,9 +65,33 @@ function App() {
     <div style={themeStyles} className="min-h-screen flex flex-col items-center justify-center">
       <Suspense fallback={<div>Loading.....</div>}>
     <Routes>
-      <Route path="/" element={<Signup />} />
-      <Route path="/signin" element={<Signin />} />
-      <Route path="/video-chat" element={<VideoChatComponent />} />
+      <Route path="/" element={
+        user ? <Navigate to="/room-setup" replace /> : <Navigate to="/signup" replace />
+      } />
+      <Route path="/signup" element={
+        <AuthRoute>
+          <Signup />
+        </AuthRoute>
+      } />
+      <Route path="/signin" element={
+        <AuthRoute>
+          <Signin />
+        </AuthRoute>
+      } />
+      <Route path="/room-setup" element={
+        <ProtectedRoute>
+          <RoomSetup />
+        </ProtectedRoute>
+      } />
+      <Route path="/video-chat/:roomId" element={
+        <ProtectedRoute>
+          <VideoChatComponent />
+        </ProtectedRoute>
+      } />
+      {/* Catch all route - redirect to appropriate page */}
+      <Route path="*" element={
+        user ? <Navigate to="/room-setup" replace /> : <Navigate to="/signup" replace />
+      } />
     </Routes>
     </Suspense>
     </div>

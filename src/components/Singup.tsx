@@ -135,7 +135,7 @@ function Singup() {
         isGoogleSignin: false // Assuming this is a regular signup
       };
       dispatch(addUser(userToSave));
-      navigate("/video-chat");
+      navigate("/room-setup");
       if (!data.success) {
         setError(data.message || "Signup failed. Please try again.");
         setLoading(false);
@@ -176,7 +176,7 @@ function Singup() {
         isGoogleSignin: true
       };
       dispatch(addUser(userToSave));
-      navigate("/video-chat");
+      navigate("/room-setup");
     } catch (error) {
       console.error("Error during Google signup:", error);
       setError("An error occurred during Google signup. Please try again.");
