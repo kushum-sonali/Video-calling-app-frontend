@@ -5,6 +5,7 @@ import { Moon } from 'lucide-react';
 import { Sun } from 'lucide-react';
 import {lazy,Suspense} from 'react';
 const Signup = lazy(() => import('./components/Singup'));
+const Signin = lazy(() => import('./components/Signin'));
 // If VideoChat is a named export:
 const VideoChatComponent = lazy(() =>
   import("./components/VideoChat").then(module => ({ default: module.VideoChat }))
@@ -13,8 +14,8 @@ const VideoChatComponent = lazy(() =>
 // If VideoChat is the default export, use this instead:
 // const VideoChatComponent = lazy(() => import("./components/VideoChat"));
 import {Routes, Route} from 'react-router-dom';
-function App() {
 
+function App() {
   const [theme, setTheme] = useState("light");
   const handleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light";
@@ -33,9 +34,10 @@ function App() {
         {theme === "dark" ? <Moon width={35} height={35}  /> : <Sun width={35} height={35}   />}
       </Button>
     <div style={themeStyles} className="min-h-screen flex flex-col items-center justify-center">
-      <Suspense fallback={<div>Loding.....</div>}>
+      <Suspense fallback={<div>Loading.....</div>}>
     <Routes>
       <Route path="/" element={<Signup />} />
+      <Route path="/signin" element={<Signin />} />
       <Route path="/video-chat" element={<VideoChatComponent />} />
     </Routes>
     </Suspense>
@@ -43,7 +45,5 @@ function App() {
     </>
   );
 }
-
-
 
 export default App;

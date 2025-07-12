@@ -22,6 +22,7 @@
     "firebase": "^11.8.1",
     "framer-motion": "^12.12.1",
     "lucide-react": "^0.487.0",
+    "motion": "^12.23.3",
     "react": "^19.1.0",
     "react-dom": "^19.0.0",
     "react-lazyload": "^3.2.1",

@@ -1,34 +1,24 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { auth, provider } from "../../firebaseConfiguration/config";
-import { signInWithPopup } from "firebase/auth";
-import { useDispatch, useSelector } from 'react-redux';
-import { addUser } from "../../store/UserSlice";
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles, Video, MessageSquare, Hand, Shield, Smartphone, Settings, Play, Users, Globe, User } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles, Video, MessageSquare, Hand, Shield, Smartphone, Settings, Play, Users, Globe } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, provider } from '../../firebaseConfiguration/config';
+import { addUser } from '../../store/UserSlice';
 import envConfig from '@/config';
 
-interface User {
-  fullName: string,
-  email: string,
-  firebaseId: string,
-  isGoogleSignin: boolean
-}
-
-function Singup() {
-  const [userName, setUserName] = useState<string>("");
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
+const Signin = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const user = useSelector((state: any) => state.user.user);
 
   // Animation variants
   const containerVariants = {
@@ -37,6 +27,7 @@ function Singup() {
       opacity: 1,
       transition: {
         duration: 0.8,
+        ease: "easeOut",
         staggerChildren: 0.1
       }
     }
@@ -47,7 +38,7 @@ function Singup() {
     visible: {
       opacity: 1,
       x: 0,
-      transition: { duration: 0.8 }
+      transition: { duration: 0.8, ease: "easeOut" }
     }
   };
 
@@ -56,7 +47,7 @@ function Singup() {
     visible: {
       opacity: 1,
       x: 0,
-      transition: { duration: 0.8 }
+      transition: { duration: 0.8, ease: "easeOut" }
     }
   };
 
@@ -65,7 +56,7 @@ function Singup() {
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.5 }
+      transition: { duration: 0.5, ease: "easeOut" }
     }
   };
 
@@ -86,100 +77,91 @@ function Singup() {
       rotate: [0, 5, -5, 0],
       transition: {
         duration: 4,
-        repeat: Infinity
+        repeat: Infinity,
+        ease: "easeInOut"
       }
     }
   };
 
-  const googleSignIn = async () => {
-    const user = await signInWithPopup(auth, provider);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
     setLoading(true);
-     
-    const userToSave = {
-      userName: user.user.displayName,
-      email: user.user.email,
-      uid: user.user.uid,
-    };
+    setError('');
 
-    googleSubmit(userToSave);
-  };
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     try {
-      e.preventDefault();
-      setLoading(true);
-      if (!userName || !email || !password) {
-        setError("Please fill all the fields");
-        setLoading(false);
-        return;
-      }
-      const result = await fetch(`${envConfig.backendUrl}/signup`, {
-        method: "POST",
+      const result = await fetch(`${envConfig.backendUrl}/signin`, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          userName,
-          email,
-          password,
-        }),
+        body: JSON.stringify({ email, password }),
       });
+
       const data = await result.json();
 
-      console.log("data", data);
-      // Assuming the response contains user data
-      const userToSave = {
-        userName: data.user.userName,
-        email: data.user.email,
-        uid: data.user.uid, // Assuming UID is returned from the server
-        isGoogleSignin: false // Assuming this is a regular signup
-      };
-      dispatch(addUser(userToSave));
-      navigate("/video-chat");
       if (!data.success) {
-        setError(data.message || "Signup failed. Please try again.");
+        setError(data.message || 'Signin failed');
         setLoading(false);
         return;
       }
 
-      // You can add your signup logic here (e.g., Firebase signup)
-      setError("");
-      setLoading(false);
-    } catch (error) {
-      console.error("Error during signup:", error);
-      setError("An error occurred during signup. Please try again.");
-      setLoading(false);
-    }
-  };
-
-  const googleSubmit = async (user: { userName: string | null, email: string | null, uid: string }) => {
-    try {
-      const result = await fetch(`${envConfig.backendUrl}/firebaseuser`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userName: user.userName,
-          email: user.email,
-          fireBaseId: user.uid
-        }),
-      });
-      const data = await result.json();
-      console.log("data", data);
-      console.log("data from server", data.user.userName, data.user.email, data.user.uid);
       const userToSave = {
         userName: data.user.userName,
         email: data.user.email,
         uid: data.user.uid,
-        // Assuming UID is returned from the server
+        isGoogleSignin: false
+      };
+
+      dispatch(addUser(userToSave));
+      navigate('/video-chat');
+    } catch (error) {
+      console.error('Signin error:', error);
+      setError('An error occurred during signin');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignin = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      const response = await fetch(`${envConfig.backendUrl}/firebaseuser`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userName: user.displayName,
+          email: user.email,
+          fireBaseId: user.uid
+        }),
+      });
+
+      const data = await response.json();
+
+      const userToSave = {
+        userName: data.user.userName,
+        email: data.user.email,
+        uid: data.user.uid,
         isGoogleSignin: true
       };
+
       dispatch(addUser(userToSave));
-      navigate("/video-chat");
+      navigate('/video-chat');
     } catch (error) {
-      console.error("Error during Google signup:", error);
-      setError("An error occurred during Google signup. Please try again.");
+      console.error('Google signin error:', error);
+      setError('Google signin failed');
+    } finally {
       setLoading(false);
     }
   };
@@ -252,7 +234,7 @@ function Singup() {
               className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight"
               variants={itemVariants}
             >
-              Start Your Journey
+              Connect Face-to-Face,
               <motion.span
                 className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600"
                 animate={{ 
@@ -264,7 +246,7 @@ function Singup() {
                   ease: "easeInOut"
                 }}
               >
-                {' '}Today
+                {' '}Anywhere
               </motion.span>
             </motion.h1>
 
@@ -273,8 +255,8 @@ function Singup() {
               className="text-lg md:text-xl text-gray-600 mb-8 leading-relaxed"
               variants={itemVariants}
             >
-              Join thousands of users who trust VideoCall for their communication needs. 
-              Create your account and start connecting with people worldwide.
+              Experience crystal-clear video calls with advanced features. 
+              Connect with friends, family, and colleagues from anywhere in the world.
             </motion.p>
 
             {/* Features Grid */}
@@ -341,7 +323,7 @@ function Singup() {
           </div>
         </motion.div>
 
-        {/* Right Signup Form */}
+        {/* Right Signin Form */}
         <motion.div
           className="w-full max-w-md lg:max-w-lg xl:max-w-xl flex items-center justify-center px-6 md:px-8 lg:px-12 py-12"
           variants={slideInRightVariants}
@@ -359,11 +341,11 @@ function Singup() {
               >
                 <Sparkles className="w-8 h-8 text-white" />
               </motion.div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h2>
-              <p className="text-gray-600">Join the VideoCall community today</p>
+              <h2 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h2>
+              <p className="text-gray-600">Sign in to continue your video calling experience</p>
             </motion.div>
 
-            {/* Signup Form */}
+            {/* Signin Form */}
             <motion.div
               className="bg-white rounded-2xl shadow-xl p-6 backdrop-blur-sm"
               variants={itemVariants}
@@ -380,43 +362,6 @@ function Singup() {
                     <p className="text-red-600 text-sm">{error}</p>
                   </motion.div>
                 )}
-
-                {loading && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex justify-center py-2"
-                  >
-                    <motion.div
-                      className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    />
-                  </motion.div>
-                )}
-
-                {/* Username field */}
-                <motion.div variants={itemVariants}>
-                  <Label htmlFor="username" className="text-gray-700 mb-2 block">
-                    Username
-                  </Label>
-                  <motion.div
-                    className="relative"
-                    whileFocus={{ scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <Input
-                      id="username"
-                      type="text"
-                      value={userName}
-                      onChange={(e) => setUserName(e.target.value)}
-                      className="pl-10 h-11 border-2 border-gray-200 focus:border-blue-500 transition-colors"
-                      placeholder="Enter your username"
-                      disabled={loading}
-                    />
-                  </motion.div>
-                </motion.div>
 
                 {/* Email field */}
                 <motion.div variants={itemVariants}>
@@ -473,7 +418,7 @@ function Singup() {
                   </motion.div>
                 </motion.div>
 
-                {/* Sign up button */}
+                {/* Sign in button */}
                 <motion.div variants={itemVariants}>
                   <motion.div
                     variants={buttonVariants}
@@ -493,7 +438,7 @@ function Singup() {
                         />
                       ) : (
                         <>
-                          Create Account
+                          Sign In
                           <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                         </>
                       )}
@@ -514,7 +459,7 @@ function Singup() {
                   </div>
                 </motion.div>
 
-                {/* Google sign up button */}
+                {/* Google sign in button */}
                 <motion.div variants={itemVariants}>
                   <motion.div
                     variants={buttonVariants}
@@ -523,7 +468,7 @@ function Singup() {
                   >
                     <Button
                       type="button"
-                      onClick={googleSignIn}
+                      onClick={handleGoogleSignin}
                       disabled={loading}
                       className="w-full h-11 bg-white border-2 border-gray-200 hover:border-gray-300 text-gray-700 font-medium rounded-lg transition-all duration-200 group"
                     >
@@ -539,20 +484,20 @@ function Singup() {
                 </motion.div>
               </form>
 
-              {/* Signin link */}
+              {/* Sign up link */}
               <motion.div
                 className="text-center mt-5"
                 variants={itemVariants}
               >
                 <p className="text-gray-600">
-                  Already have an account?{' '}
+                  Don't have an account?{' '}
                   <motion.button
-                    onClick={() => navigate('/signin')}
+                    onClick={() => navigate('/')}
                     className="text-blue-600 hover:text-blue-700 font-medium"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    Sign in
+                    Sign up
                   </motion.button>
                 </p>
               </motion.div>
@@ -562,6 +507,6 @@ function Singup() {
       </motion.div>
     </div>
   );
-}
+};
 
-export default Singup;
+export default Signin; 
