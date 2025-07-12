@@ -99,6 +99,16 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onJoinRoom, onCreateRoom }
     }
   }, [user, name]);
 
+  // Update video element when preview state changes
+  useEffect(() => {
+    if (showPreview && localStreamRef.current && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.onloadedmetadata = () => {
+        localVideoRef.current?.play().catch(console.error);
+      };
+    }
+  }, [showPreview]);
+
   // Automatically request media permissions when component mounts
   useEffect(() => {
     const initializeMedia = async () => {
@@ -114,7 +124,9 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onJoinRoom, onCreateRoom }
         // Ensure video element is ready before setting source
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
-          localVideoRef.current.play().catch(console.error);
+          localVideoRef.current.onloadedmetadata = () => {
+            localVideoRef.current?.play().catch(console.error);
+          };
         }
         
         setMediaPermissions({
@@ -226,6 +238,9 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onJoinRoom, onCreateRoom }
       // Set the video stream immediately
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
+        localVideoRef.current.onloadedmetadata = () => {
+          localVideoRef.current?.play().catch(console.error);
+        };
       }
       
       setMediaPermissions({
@@ -374,6 +389,9 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onJoinRoom, onCreateRoom }
         localStreamRef.current = stream;
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
+          localVideoRef.current.onloadedmetadata = () => {
+            localVideoRef.current?.play().catch(console.error);
+          };
         }
         console.log(`Successfully switched ${deviceType}`);
       } catch (error) {
@@ -387,6 +405,9 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onJoinRoom, onCreateRoom }
           localStreamRef.current = fallbackStream;
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = fallbackStream;
+            localVideoRef.current.onloadedmetadata = () => {
+              localVideoRef.current?.play().catch(console.error);
+            };
           }
         } catch (fallbackError) {
           console.error('Fallback stream failed:', fallbackError);
