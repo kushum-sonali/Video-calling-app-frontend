@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, use } from 'react'
 import { Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
-import { Mic, MicOff, Video, VideoOff, Send, Camera, Monitor, Users, Copy, Check } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, Send, Camera, Monitor, Users, Copy, Check, X, PhoneOff } from 'lucide-react'
 import { io, Socket } from "socket.io-client"
 import { Hand } from 'lucide-react';
 import { motion } from "framer-motion";
@@ -73,6 +73,9 @@ export function VideoChat() {
   const [remoteStream, setRemoteStream] = useState<MediaStream[]>([])
   const [onMessagePannel,setOnMesagePannel]= useState<boolean>(false)
   const [isCopied, setIsCopied] = useState<boolean>(false)
+  const [isUrlCopied, setIsUrlCopied] = useState<boolean>(false)
+  const [isInvitationCopied, setIsInvitationCopied] = useState<boolean>(false)
+  const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState<boolean>(false)
   // Scroll to bottom of messages when new messages arrive
 
   const navigate = useNavigate();
@@ -107,9 +110,30 @@ export function VideoChat() {
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream
         }
+        
+        // Check actual track status and update state
+        const videoTrack = stream.getVideoTracks()[0]
+        const audioTrack = stream.getAudioTracks()[0]
+        
+        if (videoTrack) {
+          // Ensure video track is enabled by default
+          videoTrack.enabled = true
+          setIsCameraOn(true)
+          console.log("Initial camera status:", true)
+        }
+        
+        if (audioTrack) {
+          // Ensure audio track is enabled by default
+          audioTrack.enabled = true
+          setIsMicOn(true)
+          console.log("Initial mic status:", true)
+        }
       })
       .catch(err => {
         console.error("Error accessing media devices:", err)
+        // Set to false if media access fails
+        setIsCameraOn(false)
+        setIsMicOn(false)
       })
 
     // Socket event handlers
@@ -224,11 +248,11 @@ export function VideoChat() {
         
         // Check if we can set remote description
         if (peerConnection.signalingState === "stable" || peerConnection.signalingState === "have-local-offer") {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
-          const answer = await peerConnection.createAnswer()
-          await peerConnection.setLocalDescription(answer)
-          socket.emit("answer", { to: from, answer }) 
-          console.log("Sending answer to:", from);
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+      const answer = await peerConnection.createAnswer()
+      await peerConnection.setLocalDescription(answer)
+      socket.emit("answer", { to: from, answer }) 
+    console.log("Sending answer to:", from);
         } else {
           console.warn("Cannot set remote description, peer connection state:", peerConnection.signalingState)
         }
@@ -242,11 +266,11 @@ export function VideoChat() {
       console.log("Received answer from:", from, name)
       
       try {
-        const peerConnection = peerConnectionsRef.current[from]
-        if (peerConnection) {
+      const peerConnection = peerConnectionsRef.current[from]
+      if (peerConnection) {
           // Check if we can set remote description
           if (peerConnection.signalingState === "have-local-offer") {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer))
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer))
             console.log("Successfully set remote description for answer from:", from)
           } else {
             console.warn("Cannot set remote description for answer, peer connection state:", peerConnection.signalingState)
@@ -263,9 +287,9 @@ export function VideoChat() {
       console.log("Received ICE candidate from:", from, candidate)
     
       try {
-        const peerConnection = peerConnectionsRef.current[from]
+      const peerConnection = peerConnectionsRef.current[from]
         if (peerConnection && peerConnection.remoteDescription) {
-          await peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
+        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
           console.log("Successfully added ICE candidate from:", from)
         } else {
           console.warn("Cannot add ICE candidate, no peer connection or remote description for:", from)
@@ -334,13 +358,23 @@ export function VideoChat() {
       if (videoTrack && isCameraOn !== videoTrack.enabled) {
         console.log("Syncing camera state:", videoTrack.enabled)
         setIsCameraOn(videoTrack.enabled)
-        socket.emit("camera-status", { name, cameraStatus: videoTrack.enabled, streamId: localStreamRef.current?.id })
+        socket.emit("camera-status", { 
+          name, 
+          cameraStatus: videoTrack.enabled, 
+          streamId: localStreamRef.current?.id,
+          roomId: roomId
+        })
       }
       
       if (audioTrack && isMicOn !== audioTrack.enabled) {
         console.log("Syncing mic state:", audioTrack.enabled)
         setIsMicOn(audioTrack.enabled)
-        socket.emit("mic-status", { name, micStatus: audioTrack.enabled, streamId: localStreamRef.current?.id })
+        socket.emit("mic-status", { 
+          name, 
+          micStatus: audioTrack.enabled, 
+          streamId: localStreamRef.current?.id,
+          roomId: roomId
+        })
       }
     }
 
@@ -348,7 +382,7 @@ export function VideoChat() {
     const interval = setInterval(syncMediaState, 2000)
     
     return () => clearInterval(interval)
-  }, [isConnected, isCameraOn, isMicOn, name])
+  }, [isConnected, isCameraOn, isMicOn, name, roomId])
 
   // Auto-join room from URL params and navigation state
   useEffect(() => {
@@ -393,7 +427,7 @@ export function VideoChat() {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         try {
-          peerConnection.addTrack(track, localStreamRef.current!)
+        peerConnection.addTrack(track, localStreamRef.current!)
           console.log("Added track to peer connection:", track.kind)
         } catch (error) {
           console.error("Error adding track:", error)
@@ -405,10 +439,10 @@ export function VideoChat() {
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
         try {
-          const duplicateCandidate = JSON.stringify(event.candidate);
-          const candidate = JSON.parse(duplicateCandidate);
-          console.log("Sending ICE candidate to:", userId, candidate)
-          socket.emit("ice-candidate", { to: userId, candidate })
+        const duplicateCandidate = JSON.stringify(event.candidate);
+        const candidate = JSON.parse(duplicateCandidate);
+        console.log("Sending ICE candidate to:", userId, candidate)
+        socket.emit("ice-candidate", { to: userId, candidate })
         } catch (error) {
           console.error("Error handling ICE candidate:", error)
         }
@@ -419,17 +453,17 @@ export function VideoChat() {
     peerConnection.ontrack = (event) => {
       console.log("Received remote track from:", userId, event)
       try {
-        const newStream = event.streams[0]
-        
-        setRemoteStream(prev => {
-          if (prev.some(stream => stream.id === newStream.id)) return prev
+      const newStream = event.streams[0]
+      
+      setRemoteStream(prev => {
+        if (prev.some(stream => stream.id === newStream.id)) return prev
           console.log("Adding new remote stream:", newStream.id)
-          return [...prev, newStream]
-        })
+        return [...prev, newStream]
+      })
         
-        setPeers(prev => {
-          if (prev.some(id => id === userId)) return prev
-          return [...prev, userId]
+      setPeers(prev => {
+        if (prev.some(id => id === userId)) return prev
+        return [...prev, userId]
         })
       } catch (error) {
         console.error("Error handling remote stream:", error)
@@ -464,12 +498,22 @@ export function VideoChat() {
     // Get current track states for accurate initial status
     const videoTrack = localStreamRef.current?.getVideoTracks()[0]
     const audioTrack = localStreamRef.current?.getAudioTracks()[0]
-    const currentCameraStatus = videoTrack ? videoTrack.enabled : true
-    const currentMicStatus = audioTrack ? audioTrack.enabled : true
     
-    // Sync React state with actual track state
-    setIsCameraOn(currentCameraStatus)
-    setIsMicOn(currentMicStatus)
+    // Ensure tracks are enabled by default and sync with state
+    let currentCameraStatus = true
+    let currentMicStatus = true
+    
+    if (videoTrack) {
+      videoTrack.enabled = true
+      currentCameraStatus = true
+      setIsCameraOn(true)
+    }
+    
+    if (audioTrack) {
+      audioTrack.enabled = true
+      currentMicStatus = true
+      setIsMicOn(true)
+    }
     
     socket.emit("join-room", {
       roomId, 
@@ -679,7 +723,7 @@ export function VideoChat() {
   console.log("hand raised", handRaised)
   socket.emit("handRaised", {name , handRaised:!handRaised, streamId:localStreamRef.current?.id})
   }
-
+ 
   const copyRoomId = async () => {
     try {
       await navigator.clipboard.writeText(roomId)
@@ -688,6 +732,118 @@ export function VideoChat() {
     } catch (err) {
       console.error('Failed to copy room ID:', err)
     }
+  }
+
+  const copyInvitationUrl = async () => {
+    try {
+      const invitationUrl = `${window.location.origin}/video-chat/${roomId}`
+      await navigator.clipboard.writeText(invitationUrl)
+      setIsUrlCopied(true)
+      setTimeout(() => setIsUrlCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy invitation URL:', err)
+    }
+  }
+
+  const copyFullInvitation = async () => {
+    try {
+      const invitationUrl = `${window.location.origin}/video-chat/${roomId}`
+      const currentTime = new Date().toLocaleString()
+      
+      const fullInvitation = `🎥 You're invited to join a video call!
+
+${name} is inviting you to a video meeting.
+
+📅 Meeting Details:
+• Host: ${name}
+• Time: ${currentTime}
+• Room ID: ${roomId}
+
+🔗 Join Meeting:
+Click the link below to join instantly:
+${invitationUrl}
+
+📱 Or join manually:
+1. Go to: ${window.location.origin}/room-setup
+2. Enter Room ID: ${roomId}
+3. Click "Join Room"
+
+💡 Tips:
+• Make sure your camera and microphone are working
+• Use Chrome, Firefox, or Safari for the best experience
+• Join from a quiet location for better audio quality
+
+See you in the meeting! 👋`
+
+      await navigator.clipboard.writeText(fullInvitation)
+      setIsInvitationCopied(true)
+      setTimeout(() => setIsInvitationCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy full invitation:', err)
+    }
+  }
+
+  const removeParticipant = (streamId: string) => {
+    // Find the participant to remove
+    const participantToRemove = remoteNames.find(rn => rn.streamId === streamId);
+    if (!participantToRemove) return;
+
+    // Emit remove participant event to server
+    socket.emit("remove-participant", {
+      roomId: roomId,
+      streamId: streamId,
+      name: participantToRemove.name
+    });
+
+    // Remove from local state immediately for better UX
+    setRemoteNames(prev => prev.filter(rn => rn.streamId !== streamId));
+    setRemoteStream(prev => prev.filter(stream => stream.id !== streamId));
+    
+    // Close peer connection
+    const userIdToRemove = participantToRemove.key;
+    if (peerConnectionsRef.current[userIdToRemove]) {
+      peerConnectionsRef.current[userIdToRemove].close();
+      delete peerConnectionsRef.current[userIdToRemove];
+    }
+    
+    // Remove from peers
+    setPeers(prev => prev.filter(id => id !== userIdToRemove));
+  }
+
+  const hangupCall = () => {
+    // Stop all local media tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log("Stopped local track:", track.kind);
+      });
+    }
+
+    // Close all peer connections
+    Object.entries(peerConnectionsRef.current).forEach(([userId, pc]) => {
+      console.log("Closing peer connection for:", userId);
+      pc.close();
+    });
+
+    // Clear all peer connections
+    peerConnectionsRef.current = {};
+
+    // Emit leave room event to server
+    socket.emit("leave-room", {
+      roomId: roomId,
+      name: name,
+      streamId: localStreamRef.current?.id
+    });
+
+    // Reset all states
+    setIsConnected(false);
+    setRemoteStream([]);
+    setRemoteNames([]);
+    setPeers([]);
+    setMessages([]);
+    
+    // Redirect to room setup
+    navigate("/room-setup");
   }
  
 
@@ -707,7 +863,7 @@ export function VideoChat() {
           </div>
         </div>
       )}
-     {isConnected && (
+      {isConnected && (
        <>
          {/* Top Bar */}
          <div className="absolute top-0 left-0 right-0 z-10 bg-black/20 backdrop-blur-sm border-b border-white/10">
@@ -737,7 +893,7 @@ export function VideoChat() {
                  (() => {
                    const totalUsers = remoteStream.length + 1;
                    if (totalUsers === 1) return 'grid-cols-1';
-                   if (totalUsers === 2) return 'grid-cols-2 auto-rows-fr';
+                   if (totalUsers === 2) return 'grid-cols-2 auto-rows-fr place-items-center';
                    if (totalUsers === 3) return 'grid-cols-2 auto-rows-fr';
                    if (totalUsers === 4) return 'grid-cols-2 auto-rows-fr';
                    if (totalUsers === 5 || totalUsers === 6) return 'grid-cols-3 auto-rows-fr';
@@ -746,14 +902,16 @@ export function VideoChat() {
                                }`}>
             
             {/* Local Video */}
-            <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50 aspect-video">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                muted
-                playsInline
+            <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50 ${
+              remoteStream.length === 1 ? 'aspect-[4/5] max-w-lg' : 'aspect-video'
+            }`}>
+            <video
+              ref={localVideoRef}
+              autoPlay
+              muted
+              playsInline
                 className="w-full h-full object-cover"
-              />
+            />
               
               {/* Video Overlay Info */}
               <div className="absolute top-4 left-4 flex gap-2">
@@ -794,7 +952,7 @@ export function VideoChat() {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={toggleCamera}
+                onClick={toggleCamera}
                     className={`p-3 rounded-full backdrop-blur-sm border border-white/20 transition-all duration-200 ${
                       isCameraOn 
                         ? 'bg-white/20 hover:bg-white/30 text-white' 
@@ -807,7 +965,7 @@ export function VideoChat() {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={toggleMic}
+                onClick={toggleMic}
                     className={`p-3 rounded-full backdrop-blur-sm border border-white/20 transition-all duration-200 ${
                       isMicOn 
                         ? 'bg-white/20 hover:bg-white/30 text-white' 
@@ -820,7 +978,7 @@ export function VideoChat() {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={handleHandRaided}
+                onClick={handleHandRaided}
                     className={`p-3 rounded-full backdrop-blur-sm border border-white/20 transition-all duration-200 ${
                       remoteNames.find((remoteName) => (remoteName.handRaised) && (remoteName.streamId==localStreamRef.current?.id))
                         ? 'bg-yellow-500 hover:bg-yellow-600 text-black' 
@@ -842,13 +1000,22 @@ export function VideoChat() {
                   >
                     <Monitor className="w-5 h-5" />
                   </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={hangupCall}
+                    className="p-3 rounded-full bg-red-500 hover:bg-red-600 text-white backdrop-blur-sm border border-red-400/50 transition-all duration-200"
+                  >
+                    <PhoneOff className="w-5 h-5" />
+                  </motion.button>
              
-                   {isConnected && (
+              {isConnected && (
                      <Sheet onOpenChange={(open)=>{
                        console.log("Chat sheet open state changed:", open)
                        setOnMesagePannel(open)
                      }}>
-                       <SheetTrigger asChild>
+      <SheetTrigger asChild>
                          <motion.div 
                            className='relative'
                            whileHover={{ scale: 1.05 }}
@@ -857,11 +1024,11 @@ export function VideoChat() {
                            <button className="p-3 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/20 text-white transition-all duration-200">
                              <MessageSquare className="w-5 h-5" />
                            </button>
-                           {(notification && !onMessagePannel) && (
+         {(notification && !onMessagePannel) && (
                             <div className='absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border-2 border-white' />
-                           )}
+         )}
                          </motion.div>
-                       </SheetTrigger>
+      </SheetTrigger>
       <SheetContent className="w-full sm:max-w-md bg-gray-900/95 backdrop-blur-sm border-gray-700">
         <SheetHeader>
           <SheetTitle className="text-white">Chat</SheetTitle>
@@ -923,52 +1090,53 @@ export function VideoChat() {
         
         </SheetFooter>
       </SheetContent>
-                     </Sheet>
-                   )}
+    </Sheet>
+              )}
                  </div>
                </div>
-            </div>
-
-
-
+             </div>
+            
+            
+               
             {/* Remote Videos */}
             {remoteStream.length > 0 &&
               remoteStream.map((stream, index) => {
-                console.log("remote stream",stream)
+            console.log("remote stream",stream)
                 const totalUsers = remoteStream.length + 1;
                 const isThirdUserInOddGroup = totalUsers === 3 && index === 1; // Third user (index 1 in remote, but 3rd overall)
                 
-                return (
+            return (
                   <div 
                     key={stream.id} 
-                    className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50 aspect-video ${
-                      isThirdUserInOddGroup ? 'col-start-1 col-end-3 justify-self-center max-w-md' : ''
+                    className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50 ${
+                      remoteStream.length === 1 ? 'aspect-[4/5] max-w-lg' : 
+                      isThirdUserInOddGroup ? 'aspect-video col-start-1 col-end-3 justify-self-center max-w-md' : 'aspect-video'
                     }`}
                   >
-                    <video
-                      autoPlay
-                      playsInline
+              <video
+                autoPlay
+                playsInline
                       className="w-full h-full object-cover"
-                      ref={(video) => {
-                        if (video) {
-                          video.srcObject = stream
-                        }
-                      }}
-                    />
+                ref={(video) => {
+                  if (video) {
+                    video.srcObject = stream
+                  }
+                }}
+              />
                     
                     {/* Remote Video Info */}
                     <div className="absolute top-4 left-4 flex gap-2">
-                      {remoteNames.map((remoteName) => {
-                        console.log("REMOTE NAME",remoteName)
-                        if (remoteName.streamId === stream.id) {
-                          return (
+              {remoteNames.map((remoteName) => {
+                console.log("REMOTE NAME",remoteName)
+                if (remoteName.streamId === stream.id) {
+                  return (
                             <div key={remoteName.key} className="bg-black/70 backdrop-blur-sm text-white px-3 py-1 rounded-full text-sm font-medium border border-white/20">
                               {remoteName.name}
                             </div>
-                          )
-                        }
-                        return null
-                      })}
+                  )
+                }
+                return null
+              })}
                     </div>
 
                     {/* Remote Hand Raised & Status Indicators */}
@@ -980,12 +1148,12 @@ export function VideoChat() {
                               {remoteName.handRaised && (
                                 <div className="bg-yellow-500 text-black px-3 py-1 rounded-full text-sm font-medium animate-pulse">
                                   ✋
-                                </div>
+              </div>
                               )}
                               {remoteName.cameraStatus === false && (
                                 <div className="bg-red-500/90 backdrop-blur-sm p-2 rounded-full">
                                   <VideoOff className="w-4 h-4 text-white" />
-                                </div>
+            </div>
                               )}
                               {remoteName.micStatus === false && (
                                 <div className="bg-red-500/90 backdrop-blur-sm p-2 rounded-full">
@@ -1005,93 +1173,66 @@ export function VideoChat() {
                 </div>
               </div>
 
-              {/* Participants Panel - Full width on mobile, 1/4 on desktop */}
-              <div className="xl:col-span-1 bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-4 flex flex-col order-1 xl:order-2 h-fit xl:h-full max-h-96 xl:max-h-none">
-                <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
-                  <Users className="w-5 h-5 mr-2" />
-                  Participants ({remoteStream.length + 1})
-                </h3>
-                
-                <div className="space-y-3 flex-1">
-                  {/* Local User - Always show once */}
-                  <div className="flex items-center justify-between p-3 bg-blue-500/20 border border-blue-500/50 rounded-xl">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-medium text-sm">
-                          {name ? name.charAt(0).toUpperCase() : 'Y'}
-                        </span>
+                            {/* Participants Panel - Expandable in place */}
+              <div className="xl:col-span-1 order-1 xl:order-2 h-fit">
+                <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
+                  {/* Participants Header - Always visible */}
+                  <button
+                    onClick={() => setIsParticipantsModalOpen(!isParticipantsModalOpen)}
+                    className="w-full p-4 hover:bg-gray-800/70 transition-colors duration-200"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Users className="w-5 h-5 text-gray-300" />
+                        <span className="text-white font-semibold text-lg">Participants</span>
                       </div>
-                      <div>
-                        <p className="text-white font-medium text-sm">{name} (You)</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          {isScreenSharing && (
-                            <span className="text-green-400 text-xs bg-green-500/20 px-2 py-1 rounded">Screen</span>
-                          )}
-                          {remoteNames.find((remoteName) => (remoteName.handRaised) && (remoteName.streamId==localStreamRef.current?.id)) && (
-                            <span className="text-yellow-400 text-xs bg-yellow-500/20 px-2 py-1 rounded">✋ Hand</span>
-                          )}
-                        </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-300 text-sm">({remoteStream.length + 1})</span>
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <X className={`w-4 h-4 text-gray-400 transform transition-transform duration-200 ${
+                          isParticipantsModalOpen ? 'rotate-45' : 'rotate-0'
+                        }`} />
                       </div>
                     </div>
-                    <div className="flex space-x-1">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        isCameraOn ? 'bg-green-600' : 'bg-red-500'
-                      }`}>
-                        {isCameraOn ? (
-                          <Video className="w-3 h-3 text-white" />
-                        ) : (
-                          <VideoOff className="w-3 h-3 text-white" />
-                        )}
-                      </div>
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        isMicOn ? 'bg-green-600' : 'bg-red-500'
-                      }`}>
-                        {isMicOn ? (
-                          <Mic className="w-3 h-3 text-white" />
-                        ) : (
-                          <MicOff className="w-3 h-3 text-white" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  </button>
 
-                  {/* Remote Users - Only show users with active streams */}
-                  {remoteStream.map((stream) => {
-                    const remoteName = remoteNames.find(rn => rn.streamId === stream.id);
-                    if (!remoteName) return null;
-                    
-                    return (
-                      <div key={stream.id} className="flex items-center justify-between p-3 bg-gray-700/50 border border-gray-600/50 rounded-xl">
+                  {/* Participants List - Expandable */}
+                  {isParticipantsModalOpen && (
+                    <div className="border-t border-gray-700/50 p-4 space-y-3 max-h-96 overflow-y-auto">
+                      {/* Local User - Always show once */}
+                      <div className="flex items-center justify-between p-3 bg-blue-500/20 border border-blue-500/50 rounded-xl">
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
+                          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
                             <span className="text-white font-medium text-sm">
-                              {remoteName.name ? remoteName.name.charAt(0).toUpperCase() : 'U'}
+                              {name ? name.charAt(0).toUpperCase() : 'Y'}
                             </span>
                           </div>
                           <div>
-                            <p className="text-white font-medium text-sm">{remoteName.name}</p>
+                            <p className="text-white font-medium text-sm">{name} (You)</p>
                             <div className="flex items-center space-x-2 mt-1">
-                              {remoteName.handRaised && (
+                              {isScreenSharing && (
+                                <span className="text-green-400 text-xs bg-green-500/20 px-2 py-1 rounded">Screen</span>
+                              )}
+                              {remoteNames.find((remoteName) => (remoteName.handRaised) && (remoteName.streamId==localStreamRef.current?.id)) && (
                                 <span className="text-yellow-400 text-xs bg-yellow-500/20 px-2 py-1 rounded">✋ Hand</span>
                               )}
-                              <span className="text-green-400 text-xs">Connected</span>
                             </div>
                           </div>
                         </div>
                         <div className="flex space-x-1">
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            remoteName.cameraStatus === true ? 'bg-green-600' : 'bg-red-500'
+                            isCameraOn ? 'bg-green-600' : 'bg-red-500'
                           }`}>
-                            {remoteName.cameraStatus === true ? (
+                            {isCameraOn ? (
                               <Video className="w-3 h-3 text-white" />
                             ) : (
                               <VideoOff className="w-3 h-3 text-white" />
                             )}
                           </div>
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            remoteName.micStatus === true ? 'bg-green-600' : 'bg-red-500'
+                            isMicOn ? 'bg-green-600' : 'bg-red-500'
                           }`}>
-                            {remoteName.micStatus === true ? (
+                            {isMicOn ? (
                               <Mic className="w-3 h-3 text-white" />
                             ) : (
                               <MicOff className="w-3 h-3 text-white" />
@@ -1099,8 +1240,62 @@ export function VideoChat() {
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
+
+                      {/* Remote Users - Only show users with active streams */}
+                      {remoteStream.map((stream) => {
+                        const remoteName = remoteNames.find(rn => rn.streamId === stream.id);
+                        if (!remoteName) return null;
+                        
+                        return (
+                          <div key={stream.id} className="flex items-center justify-between p-3 bg-gray-700/50 border border-gray-600/50 rounded-xl group">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
+                                <span className="text-white font-medium text-sm">
+                                  {remoteName.name ? remoteName.name.charAt(0).toUpperCase() : 'U'}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-white font-medium text-sm">{remoteName.name}</p>
+                                <div className="flex items-center space-x-2 mt-1">
+                                  {remoteName.handRaised && (
+                                    <span className="text-yellow-400 text-xs bg-yellow-500/20 px-2 py-1 rounded">✋ Hand</span>
+                                  )}
+                                  <span className="text-green-400 text-xs">Connected</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                                remoteName.cameraStatus === true ? 'bg-green-600' : 'bg-red-500'
+                              }`}>
+                                {remoteName.cameraStatus === true ? (
+                                  <Video className="w-3 h-3 text-white" />
+                                ) : (
+                                  <VideoOff className="w-3 h-3 text-white" />
+                                )}
+                              </div>
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                                remoteName.micStatus === true ? 'bg-green-600' : 'bg-red-500'
+                              }`}>
+                                {remoteName.micStatus === true ? (
+                                  <Mic className="w-3 h-3 text-white" />
+                                ) : (
+                                  <MicOff className="w-3 h-3 text-white" />
+                                )}
+                              </div>
+                              <button
+                                onClick={() => removeParticipant(stream.id)}
+                                className="w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 ml-2"
+                                title="Remove participant"
+                              >
+                                <X className="w-3 h-3 text-red-400 hover:text-white" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
                        </div>
@@ -1118,27 +1313,81 @@ export function VideoChat() {
                </div>
                <div>
                  <h3 className="text-white text-xl font-semibold mb-2">Waiting for others to join...</h3>
-                 <p className="text-gray-400 text-sm mb-4">Share the room ID with others to start the meeting</p>
-                 <div className="bg-gray-700/50 rounded-lg p-3">
-                   <p className="text-gray-300 text-xs mb-1">Room ID</p>
+                 <p className="text-gray-400 text-sm mb-4">Share the invitation with others to start the meeting</p>
+                 
+                 {/* Full Invitation Message */}
+                 <div className="bg-gray-700/50 rounded-lg p-3 mb-3">
                    <div className="flex items-center justify-between">
-                     <p className="text-blue-400 font-mono text-lg font-semibold">{roomId}</p>
+                     <div>
+                       <p className="text-gray-300 text-xs mb-1">Complete Invitation Message</p>
+                       <p className="text-gray-400 text-sm">Copy the full invitation like Zoom</p>
+                     </div>
                      <button
-                       onClick={copyRoomId}
-                       className="ml-3 p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg transition-colors duration-200 flex items-center gap-2"
+                       onClick={copyFullInvitation}
+                       className="p-2 bg-green-500/20 hover:bg-green-500/30 rounded-lg transition-colors duration-200 flex items-center gap-2 flex-shrink-0"
                      >
-                       {isCopied ? (
+                       {isInvitationCopied ? (
                          <>
                            <Check className="w-4 h-4 text-green-400" />
                            <span className="text-green-400 text-sm">Copied!</span>
                          </>
                        ) : (
                          <>
-                           <Copy className="w-4 h-4 text-blue-400" />
-                           <span className="text-blue-400 text-sm">Copy</span>
+                           <Copy className="w-4 h-4 text-green-400" />
+                           <span className="text-green-400 text-sm">Copy Invitation</span>
                          </>
                        )}
                      </button>
+                   </div>
+                 </div>
+
+                 {/* Individual Copy Options */}
+                 <div className="bg-gray-700/50 rounded-lg p-3 space-y-3">
+                   <div>
+                     <p className="text-gray-300 text-xs mb-1">Room ID</p>
+                     <div className="flex items-center justify-between">
+                       <p className="text-blue-400 font-mono text-lg font-semibold">{roomId}</p>
+                       <button
+                         onClick={copyRoomId}
+                         className="p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg transition-colors duration-200 flex items-center gap-2 flex-shrink-0"
+                       >
+                         {isCopied ? (
+                           <>
+                             <Check className="w-4 h-4 text-green-400" />
+                             <span className="text-green-400 text-sm">Copied!</span>
+                           </>
+                         ) : (
+                           <>
+                             <Copy className="w-4 h-4 text-blue-400" />
+                             <span className="text-blue-400 text-sm">Copy ID</span>
+                           </>
+                         )}
+                       </button>
+                     </div>
+                   </div>
+                   <div>
+                     <p className="text-gray-300 text-xs mb-1">Direct Link</p>
+                     <div className="flex items-center justify-between">
+                       <p className="text-blue-400 font-mono text-sm break-all mr-2">
+                         {`${window.location.origin}/video-chat/${roomId}`}
+                       </p>
+                       <button
+                         onClick={copyInvitationUrl}
+                         className="p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg transition-colors duration-200 flex items-center gap-2 flex-shrink-0"
+                       >
+                         {isUrlCopied ? (
+                           <>
+                             <Check className="w-4 h-4 text-green-400" />
+                             <span className="text-green-400 text-sm">Copied!</span>
+                           </>
+                         ) : (
+                           <>
+                             <Copy className="w-4 h-4 text-blue-400" />
+                             <span className="text-blue-400 text-sm">Copy URL</span>
+                           </>
+                         )}
+                       </button>
+                     </div>
                    </div>
                  </div>
                </div>
@@ -1156,7 +1405,7 @@ export function VideoChat() {
                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                <span className="text-sm">Connected to Room {roomId}</span>
              </div>
-             <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-3">
                <motion.button
                  whileHover={{ scale: 1.05 }}
                  whileTap={{ scale: 0.95 }}
@@ -1165,20 +1414,9 @@ export function VideoChat() {
                >
                  Change Room
                </motion.button>
-               <motion.button
-                 whileHover={{ scale: 1.05 }}
-                 whileTap={{ scale: 0.95 }}
-                 onClick={() => {
-                   dispatch(logout({}))
-                   navigate("/signup")
-                 }}
-                 className="px-4 py-2 bg-red-500/80 hover:bg-red-500 backdrop-blur-sm border border-red-400/50 rounded-lg text-white transition-all duration-200"
-               >
-                 Logout
-               </motion.button>
              </div>
            </div>
-         </div>
+       </div>
       </div>
   
     </>

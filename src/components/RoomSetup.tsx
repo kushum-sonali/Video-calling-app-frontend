@@ -30,8 +30,9 @@ import {
   X,
   ChevronDown
 } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { logout } from '../../store/UserSlice';
 
 
 interface RoomSetupProps {
@@ -48,6 +49,7 @@ interface MediaSettings {
 
 export const RoomSetup: React.FC<RoomSetupProps> = ({ onJoinRoom, onCreateRoom }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [mode, setMode] = useState<'join' | 'create'>('join');
   const [roomId, setRoomId] = useState('');
   const [name, setName] = useState('');
@@ -293,6 +295,20 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onJoinRoom, onCreateRoom }
     return result;
   };
 
+  // Handle logout
+  const handleLogout = () => {
+    // Stop any active media streams
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+    }
+    
+    // Dispatch logout action
+    dispatch(logout({}));
+    
+    // Navigate to signin page
+    navigate('/signin');
+  };
+
   // Handle room creation
   const handleCreateRoom = () => {
     if (!name.trim()) {
@@ -418,6 +434,24 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onJoinRoom, onCreateRoom }
 
   return (
     <div className="w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden">
+      {/* Logout Button */}
+      <motion.div
+        className="absolute top-6 right-6 z-10"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.5 }}
+      >
+        <Button
+          onClick={handleLogout}
+          variant="outline"
+          size="sm"
+          className="bg-white/80 backdrop-blur-sm hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-all duration-200"
+        >
+          <X className="w-4 h-4 mr-2" />
+          Logout
+        </Button>
+      </motion.div>
+
       {/* Floating background elements */}
       <motion.div
         className="absolute top-10 left-10 w-20 h-20 bg-blue-200 rounded-full opacity-20"
