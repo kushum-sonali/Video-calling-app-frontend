@@ -506,7 +506,12 @@ export function VideoChat() {
         const newCameraStatus = !videoTrack.enabled
         videoTrack.enabled = newCameraStatus
         setIsCameraOn(newCameraStatus)
-        socket.emit("camera-status", { name, cameraStatus: newCameraStatus, streamId:localStreamRef.current?.id })
+        socket.emit("camera-status", { 
+          name, 
+          cameraStatus: newCameraStatus, 
+          streamId: localStreamRef.current?.id,
+          roomId: roomId
+        })
         console.log("Camera toggled to:", newCameraStatus)
       }
     }
@@ -519,7 +524,12 @@ export function VideoChat() {
         const newMicStatus = !audioTrack.enabled
         audioTrack.enabled = newMicStatus
         setIsMicOn(newMicStatus)
-        socket.emit("mic-status", { name, micStatus: newMicStatus, streamId:localStreamRef.current?.id })
+        socket.emit("mic-status", { 
+          name, 
+          micStatus: newMicStatus, 
+          streamId: localStreamRef.current?.id,
+          roomId: roomId
+        })
         console.log("Mic toggled to:", newMicStatus)
       }
     }
