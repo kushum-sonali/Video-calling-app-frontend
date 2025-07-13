@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, use } from 'react'
 import { Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
-import { Mic, MicOff, Video, VideoOff, Send, Camera, Monitor, Users } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, Send, Camera, Monitor, Users, Copy, Check } from 'lucide-react'
 import { io, Socket } from "socket.io-client"
 import { Hand } from 'lucide-react';
 import { motion } from "framer-motion";
@@ -72,6 +72,7 @@ export function VideoChat() {
   const [notification, setNotification] = useState<boolean>(false)
   const [remoteStream, setRemoteStream] = useState<MediaStream[]>([])
   const [onMessagePannel,setOnMesagePannel]= useState<boolean>(false)
+  const [isCopied, setIsCopied] = useState<boolean>(false)
   // Scroll to bottom of messages when new messages arrive
 
   const navigate = useNavigate();
@@ -322,6 +323,33 @@ export function VideoChat() {
     }
   },[isConnected])
 
+  // Sync React state with actual track state periodically
+  useEffect(() => {
+    if (!isConnected || !localStreamRef.current) return;
+
+    const syncMediaState = () => {
+      const videoTrack = localStreamRef.current?.getVideoTracks()[0]
+      const audioTrack = localStreamRef.current?.getAudioTracks()[0]
+      
+      if (videoTrack && isCameraOn !== videoTrack.enabled) {
+        console.log("Syncing camera state:", videoTrack.enabled)
+        setIsCameraOn(videoTrack.enabled)
+        socket.emit("camera-status", { name, cameraStatus: videoTrack.enabled, streamId: localStreamRef.current?.id })
+      }
+      
+      if (audioTrack && isMicOn !== audioTrack.enabled) {
+        console.log("Syncing mic state:", audioTrack.enabled)
+        setIsMicOn(audioTrack.enabled)
+        socket.emit("mic-status", { name, micStatus: audioTrack.enabled, streamId: localStreamRef.current?.id })
+      }
+    }
+
+    // Check every 2 seconds
+    const interval = setInterval(syncMediaState, 2000)
+    
+    return () => clearInterval(interval)
+  }, [isConnected, isCameraOn, isMicOn, name])
+
   // Auto-join room from URL params and navigation state
   useEffect(() => {
     const roomData = location.state as any;
@@ -433,10 +461,29 @@ export function VideoChat() {
     
     console.log("sending stream Id", localStreamRef.current?.id,localStreamRef)
   
-    socket.emit("join-room", {roomId, name, streamId:localStreamRef.current?.id,handRaised:false, cameraStatus: localStreamRef.current?.getVideoTracks()[0].enabled,micStatus: localStreamRef.current?.getAudioTracks()[0].enabled})
+    // Get current track states for accurate initial status
+    const videoTrack = localStreamRef.current?.getVideoTracks()[0]
+    const audioTrack = localStreamRef.current?.getAudioTracks()[0]
+    const currentCameraStatus = videoTrack ? videoTrack.enabled : true
+    const currentMicStatus = audioTrack ? audioTrack.enabled : true
+    
+    // Sync React state with actual track state
+    setIsCameraOn(currentCameraStatus)
+    setIsMicOn(currentMicStatus)
+    
+    socket.emit("join-room", {
+      roomId, 
+      name, 
+      streamId: localStreamRef.current?.id,
+      handRaised: false, 
+      cameraStatus: currentCameraStatus,
+      micStatus: currentMicStatus
+    })
     setIsConnected(true)
     setRoomId(roomId)
     setName(name)
+    
+    console.log("Joined room with camera:", currentCameraStatus, "mic:", currentMicStatus)
     
     // Add a welcome message to test chat
     setTimeout(() => {
@@ -455,22 +502,26 @@ export function VideoChat() {
   const toggleCamera = () => {
     if (localStreamRef.current) {
       const videoTrack = localStreamRef.current.getVideoTracks()[0]
-      videoTrack.enabled = !videoTrack.enabled
-      setIsCameraOn(!isCameraOn)
-      const cameraStatus= videoTrack.enabled ? true : false
-      socket.emit("camera-status", { name, cameraStatus, streamId:localStreamRef.current?.id })
-      console.log("Camera status", cameraStatus)
+      if (videoTrack) {
+        const newCameraStatus = !videoTrack.enabled
+        videoTrack.enabled = newCameraStatus
+        setIsCameraOn(newCameraStatus)
+        socket.emit("camera-status", { name, cameraStatus: newCameraStatus, streamId:localStreamRef.current?.id })
+        console.log("Camera toggled to:", newCameraStatus)
+      }
     }
   }
 
   const toggleMic = () => {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0]
-      audioTrack.enabled = !audioTrack.enabled
-      setIsMicOn(!isMicOn)
-      const micStatus = audioTrack.enabled ? true : false
-      socket.emit("mic-status", { name, micStatus, streamId:localStreamRef.current?.id })
-      console.log("Mic status", micStatus)
+      if (audioTrack) {
+        const newMicStatus = !audioTrack.enabled
+        audioTrack.enabled = newMicStatus
+        setIsMicOn(newMicStatus)
+        socket.emit("mic-status", { name, micStatus: newMicStatus, streamId:localStreamRef.current?.id })
+        console.log("Mic toggled to:", newMicStatus)
+      }
     }
   }
 
@@ -618,6 +669,16 @@ export function VideoChat() {
   console.log("hand raised", handRaised)
   socket.emit("handRaised", {name , handRaised:!handRaised, streamId:localStreamRef.current?.id})
   }
+
+  const copyRoomId = async () => {
+    try {
+      await navigator.clipboard.writeText(roomId)
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy room ID:', err)
+    }
+  }
  
 
 
@@ -642,10 +703,6 @@ export function VideoChat() {
          <div className="absolute top-0 left-0 right-0 z-10 bg-black/20 backdrop-blur-sm border-b border-white/10">
            <div className="flex items-center justify-between px-6 py-4">
              <div className="flex items-center space-x-4">
-               <div className="bg-gradient-to-r from-blue-500 to-purple-600 px-4 py-2 rounded-full shadow-lg"> 
-                 <span className="text-white font-medium">Hello {user?.userName}</span>
-                 <span className="ml-2 text-2xl">👋</span>
-               </div>
                <div className="hidden md:flex items-center space-x-2 text-gray-300">
                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                  <span className="text-sm">Room: {roomId}</span>
@@ -676,8 +733,8 @@ export function VideoChat() {
                    if (totalUsers === 5 || totalUsers === 6) return 'grid-cols-3 auto-rows-fr';
                    return 'grid-cols-3 auto-rows-fr';
                  })()
-               }`}>
-          
+                               }`}>
+            
             {/* Local Video */}
             <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50 aspect-video">
               <video
@@ -861,6 +918,9 @@ export function VideoChat() {
                  </div>
                </div>
             </div>
+
+
+
             {/* Remote Videos */}
             {remoteStream.length > 0 &&
               remoteStream.map((stream, index) => {
@@ -965,7 +1025,7 @@ export function VideoChat() {
                     </div>
                     <div className="flex space-x-1">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        isCameraOn ? 'bg-gray-600' : 'bg-red-500'
+                        isCameraOn ? 'bg-green-600' : 'bg-red-500'
                       }`}>
                         {isCameraOn ? (
                           <Video className="w-3 h-3 text-white" />
@@ -974,7 +1034,7 @@ export function VideoChat() {
                         )}
                       </div>
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        isMicOn ? 'bg-gray-600' : 'bg-red-500'
+                        isMicOn ? 'bg-green-600' : 'bg-red-500'
                       }`}>
                         {isMicOn ? (
                           <Mic className="w-3 h-3 text-white" />
@@ -1010,18 +1070,18 @@ export function VideoChat() {
                         </div>
                         <div className="flex space-x-1">
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            remoteName.cameraStatus ? 'bg-gray-600' : 'bg-red-500'
+                            remoteName.cameraStatus === true ? 'bg-green-600' : 'bg-red-500'
                           }`}>
-                            {remoteName.cameraStatus ? (
+                            {remoteName.cameraStatus === true ? (
                               <Video className="w-3 h-3 text-white" />
                             ) : (
                               <VideoOff className="w-3 h-3 text-white" />
                             )}
                           </div>
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            remoteName.micStatus ? 'bg-gray-600' : 'bg-red-500'
+                            remoteName.micStatus === true ? 'bg-green-600' : 'bg-red-500'
                           }`}>
-                            {remoteName.micStatus ? (
+                            {remoteName.micStatus === true ? (
                               <Mic className="w-3 h-3 text-white" />
                             ) : (
                               <MicOff className="w-3 h-3 text-white" />
@@ -1032,39 +1092,49 @@ export function VideoChat() {
                     );
                   })}
                 </div>
-
-                {/* Quick Actions */}
-                <div className="border-t border-gray-600/50 pt-4 mt-4">
-                  <div className="grid grid-cols-2 gap-2">
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={toggleMic}
-                      className={`p-2 rounded-lg text-xs font-medium transition-all ${
-                        isMicOn 
-                          ? 'bg-gray-600 hover:bg-gray-500 text-white' 
-                          : 'bg-red-500 hover:bg-red-600 text-white'
-                      }`}
-                    >
-                      {isMicOn ? <Mic className="w-3 h-3 mx-auto" /> : <MicOff className="w-3 h-3 mx-auto" />}
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={toggleCamera}
-                      className={`p-2 rounded-lg text-xs font-medium transition-all ${
-                        isCameraOn 
-                          ? 'bg-gray-600 hover:bg-gray-500 text-white' 
-                          : 'bg-red-500 hover:bg-red-600 text-white'
-                      }`}
-                    >
-                      {isCameraOn ? <Video className="w-3 h-3 mx-auto" /> : <VideoOff className="w-3 h-3 mx-auto" />}
-                    </motion.button>
-                  </div>
-                </div>
               </div>
-            </div>
-          </div>
+                       </div>
+         </div>
+
+         {/* Waiting for Users Popup - Only show when truly alone */}
+         {remoteStream.length === 0 && isConnected && (
+           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+             <div className="bg-gray-800/90 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-8 max-w-md mx-4 text-center space-y-6">
+               <div className="w-16 h-16 mx-auto">
+                 <div className="relative">
+                   <div className="w-16 h-16 border-4 border-blue-500/30 rounded-full"></div>
+                   <div className="absolute inset-0 w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                 </div>
+               </div>
+               <div>
+                 <h3 className="text-white text-xl font-semibold mb-2">Waiting for others to join...</h3>
+                 <p className="text-gray-400 text-sm mb-4">Share the room ID with others to start the meeting</p>
+                 <div className="bg-gray-700/50 rounded-lg p-3">
+                   <p className="text-gray-300 text-xs mb-1">Room ID</p>
+                   <div className="flex items-center justify-between">
+                     <p className="text-blue-400 font-mono text-lg font-semibold">{roomId}</p>
+                     <button
+                       onClick={copyRoomId}
+                       className="ml-3 p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg transition-colors duration-200 flex items-center gap-2"
+                     >
+                       {isCopied ? (
+                         <>
+                           <Check className="w-4 h-4 text-green-400" />
+                           <span className="text-green-400 text-sm">Copied!</span>
+                         </>
+                       ) : (
+                         <>
+                           <Copy className="w-4 h-4 text-blue-400" />
+                           <span className="text-blue-400 text-sm">Copy</span>
+                         </>
+                       )}
+                     </button>
+                   </div>
+                 </div>
+               </div>
+             </div>
+           </div>
+         )}
        </>
      )}
 

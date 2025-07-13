@@ -451,6 +451,17 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onJoinRoom, onCreateRoom }
             className="space-y-6 h-full flex flex-col"
             variants={slideInVariants}
           >
+            {/* User Greeting */}
+            <motion.div
+              className="flex justify-start"
+              variants={itemVariants}
+            >
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 px-4 py-2 rounded-full shadow-lg"> 
+                <span className="text-white font-medium">Hello {user?.userName}</span>
+                <span className="ml-2 text-2xl">👋</span>
+              </div>
+            </motion.div>
+
             {/* Header */}
             <motion.div
               className="text-center space-y-4"
