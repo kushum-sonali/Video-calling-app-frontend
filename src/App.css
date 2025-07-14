@@ -16,3 +16,46 @@
    60% { transform: rotate( 0.0deg) }  /* Reset for the last half to pause */
   100% { transform: rotate( 0.0deg) }
 }
+
+/* Prevent video container layout shifts */
+.video-container {
+  contain: layout style;
+  will-change: auto;
+  min-height: 200px;
+}
+
+.video-container video {
+  contain: layout style;
+  will-change: auto;
+}
+
+/* Ensure proper video sizing for 2-user layout */
+.grid-cols-2 .video-container {
+  max-width: 500px;
+  max-height: 400px;
+  width: 100%;
+  height: 100%;
+  justify-self: center;
+  align-self: center;
+}
+
+/* Ensure proper video sizing for single user */
+.grid-cols-1 .video-container {
+  max-width: 600px;
+  max-height: 450px;
+  justify-self: center;
+  align-self: center;
+}
+
+/* Ensure proper video sizing for 3+ users */
+.grid-cols-3 .video-container {
+  max-width: 350px;
+  max-height: 280px;
+  width: 100%;
+  height: 100%;
+}
+
+/* Fix self camera to be non-mirrored */
+.local-video {
+  transform: scaleX(-1);
+}
